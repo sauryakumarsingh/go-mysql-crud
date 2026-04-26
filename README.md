@@ -27,6 +27,110 @@ go-mysql-crud/
 └── docker-compose.yml              # MySQL + API together
 ```
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT REQUESTS                                 │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            ROUTER (router.go)                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  /health              → Health Check + DB Ping                     │   │
+│  │  /api/v1/products/*   → Product Handler (CRUD + Filters)          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │         MIDDLEWARE           │
+                    │  ┌─────────┐ ┌─────────┐    │
+                    │  │ Logger  │ │   CORS  │    │
+                    │  └─────────┘ └─────────┘    │
+                    └─────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         HANDLERS (handlers/)                                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     product_handler.go                              │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                 │   │
+│  │  │ GetProducts  │ │ GetProduct   │ │ CreateProduct│                 │   │
+│  │  │ (filter/     │ │   (by ID)    │ │              │                 │   │
+│  │  │  search)     │ │              │ │              │                 │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘                 │   │
+│  │  ┌──────────────┐ ┌──────────────┐                                  │   │
+│  │  │ UpdateProduct│ │ DeleteProduct│                                  │   │
+│  │  │ (partial)    │ │              │                                  │   │
+│  │  └──────────────┘ └──────────────┘                                  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          MODELS (models.go)                                  │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Product { ID, Name, Description, Price, Stock, Category,        │   │
+│  │            CreatedAt, UpdatedAt }                                  │   │
+│  │  ProductFilter { Category, Search, Limit, Offset }                │   │
+│  │  ProductStats { TotalProducts, TotalStock, AvgPrice, Categories } │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      REPOSITORY (repository/)                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     product_repo.go                                 │   │
+│  │  ┌──────────────────────────────────────────────────────────────┐  │   │
+│  │  │  ALL SQL QUERIES — raw database/sql (no ORM)                │  │   │
+│  │  │                                                               │  │   │
+│  │  │  • FindAll(filter) → SELECT with WHERE category=?           │  │   │
+│  │  │  • FindByID(id)    → SELECT * FROM products WHERE id=?      │  │   │
+│  │  │  • Create(product) → INSERT INTO products (...)             │  │   │
+│  │  │  • Update(id, product) → UPDATE products SET ...             │  │   │
+│  │  │  • Delete(id)      → DELETE FROM products WHERE id=?        │  │   │
+│  │  │  • Stats()         → SELECT COUNT, SUM, AVG, COUNT DISTINCT │  │   │
+│  │  └──────────────────────────────────────────────────────────────┘  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DATABASE (MySQL)                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  products table                                                    │   │
+│  │  ┌────────────┬──────────────┬─────────────┬───────┐              │   │
+│  │  │ id (UUID) │ name         │ description │ price │ ...          │   │
+│  │  └────────────┴──────────────┴─────────────┴───────┘              │   │
+│  │                                                                   │   │
+│  │  Indexes: idx_category, idx_created_at                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Request Flow
+
+1. **Request** → Router matches path & method
+2. **Middleware** → Logger → CORS
+3. **Handler** → Validates input, calls repository
+4. **Model** → Struct definitions & DTOs
+5. **Repository** → Executes raw SQL queries
+6. **Database** → MySQL returns results
+7. **Response** → Handler formats JSON response
+
+### Layer Responsibilities
+
+| Layer | Responsibility |
+|-------|----------------|
+| `router` | URL mapping, route registration |
+| `middleware` | Cross-cutting concerns (logging, CORS) |
+| `handlers` | HTTP logic, input validation, response formatting |
+| `models` | Data structures, request/response DTOs |
+| `repository` | All SQL queries, data access (no ORM) |
+| `db` | MySQL connection pool management |
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
