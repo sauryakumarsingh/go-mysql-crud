@@ -1,0 +1,94 @@
+### Go MySQL CRUD — VS Code REST Client
+### Install: humao.rest-client extension
+### Click "Send Request" above each block
+
+@base = http://localhost:8080/api/v1
+@id   = PASTE_PRODUCT_ID_HERE
+
+### ─── Health ────────────────────────────────────────────────────────────────
+
+GET http://localhost:8080/health
+
+### ─── CREATE ────────────────────────────────────────────────────────────────
+
+### Create Product 1
+POST {{base}}/products
+Content-Type: application/json
+
+{
+  "name": "MacBook Pro 14",
+  "description": "Apple M3 Pro chip, 18GB RAM",
+  "price": 1999.99,
+  "stock": 25,
+  "category": "Electronics"
+}
+
+###
+
+### Create Product 2
+POST {{base}}/products
+Content-Type: application/json
+
+{
+  "name": "Clean Code",
+  "description": "A handbook of agile software craftsmanship",
+  "price": 34.99,
+  "stock": 150,
+  "category": "Books"
+}
+
+### ─── READ ───────────────────────────────────────────────────────────────────
+
+### List all products
+GET {{base}}/products
+
+###
+
+### Filter by category
+GET {{base}}/products?category=Electronics
+
+###
+
+### Search by keyword
+GET {{base}}/products?search=apple
+
+###
+
+### Get single product (paste ID from create response)
+GET {{base}}/products/cdd73f28-6e75-4435-83ec-59c6faf171bf
+
+###
+
+### Stats — total products, stock, avg price, categories
+GET {{base}}/products/stats
+
+### ─── UPDATE ──────────────────────────────────────────────────────────────────
+
+### Update product (partial — only send fields you want to change)
+PUT {{base}}/products/cdd73f28-6e75-4435-83ec-59c6faf171bf
+Content-Type: application/json
+
+{
+  "price": 1799.99,
+  "stock": 30
+}
+
+### ─── DELETE ──────────────────────────────────────────────────────────────────
+
+### Delete product
+DELETE {{base}}/products/10a51459-2134-4b98-b605-8293e3776f62
+
+### ─── Error Cases (try these too) ───────────────────────────────────────────
+
+### Missing required field → 400
+POST {{base}}/products
+Content-Type: application/json
+
+{
+  "description": "No name provided"
+}
+
+###
+
+### Non-existent ID → 404
+GET {{base}}/products/non-existent-id-12345

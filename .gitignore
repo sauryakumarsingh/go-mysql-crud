@@ -1,0 +1,9 @@
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Build outputs
+bin/
